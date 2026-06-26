@@ -1,9 +1,6 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 
-export default function Toast({ message, type='success' }){
-  useEffect(()=>{
-    const t = setTimeout(()=>{},3000)
-    return ()=>clearTimeout(t)
-  },[message])
+export default function Toast({ message, type = 'success' }) {
+  if (!message) return null
   return <div className={`toast ${type}`}>{message}</div>
 }

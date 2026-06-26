@@ -1,54 +1,101 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import detectIntent from '../utils/detectIntent'
 
-export default function CaptureInput({ onSubmit }){
+export default function CaptureInput({ onCapture }) {
   const [text, setText] = useState('')
-  const [listening, setListening] = useState(false)
+  const [detectedType, setDetectedType] = useState('note')
+  const [isListening, setIsListening] = useState(false)
   const recognitionRef = useRef(null)
 
-  useEffect(()=>{
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
-    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition
-    const r = new Rec()
-    r.lang = 'en-US'
-    r.interimResults = false
-    r.onresult = (e) => { setText(t => t + ' ' + e.results[0][0].transcript) }
-    r.onend = ()=> setListening(false)
-    recognitionRef.current = r
-  },[])
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) return undefined
 
-  const handleKeyDown = (e)=>{
-    if (e.key === 'Enter' && !e.shiftKey){
-      e.preventDefault(); submit();
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'en-US'
+    recognition.continuous = false
+    recognition.interimResults = false
+
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0].transcript)
+        .join(' ')
+      setText((current) => (current ? `${current} ${transcript}` : transcript))
+      setDetectedType(detectIntent(transcript))
+      setIsListening(false)
+    }
+
+    recognition.onerror = () => {
+      setIsListening(false)
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+    }
+
+    recognitionRef.current = recognition
+    return () => recognition.stop()
+  }, [])
+
+  const handleChange = (event) => {
+    const value = event.target.value
+    setText(value)
+    setDetectedType(detectIntent(value))
+  }
+
+  const handleSubmit = () => {
+    if (!text.trim()) return
+    onCapture(text)
+    setText('')
+    setDetectedType('note')
+  }
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      handleSubmit()
     }
   }
 
-  const submit = async ()=>{
-    if (!text.trim()) return;
-    try {
-      await onSubmit(text.trim())
-      setText('')
-    } catch (err) { console.error(err) }
+  const toggleVoice = () => {
+    if (!recognitionRef.current) return
+
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+      return
+    }
+
+    recognitionRef.current.start()
+    setIsListening(true)
   }
 
-  const toggleMic = ()=>{
-    const r = recognitionRef.current
-    if (!r) return alert('Speech API not supported in this browser')
-    if (listening){ r.stop(); setListening(false) }
-    else { r.start(); setListening(true) }
-  }
-
-  const type = detectIntent(text)
+  const supportsVoice = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 
   return (
-    <div style={{marginBottom:8}}>
-      <div style={{display:'flex',alignItems:'center',gap:8}}>
-        <span className={`badge ${type}`}>{type}</span>
-        <textarea value={text} onChange={e=>setText(e.target.value)} onKeyDown={handleKeyDown} rows={3} style={{flex:1,padding:8,borderRadius:8}} placeholder="Capture a thought, todo, or reminder..." />
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          <button className="btn" onClick={submit}>Submit</button>
-          <button className="btn" onClick={toggleMic}>{listening ? 'Stop' : '🎤'}</button>
+    <div className="capture-card">
+      <textarea
+        className="capture-input"
+        value={text}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder="Capture a task, note, or reminder..."
+      />
+      <div className="capture-toolbar">
+        <div className="capture-actions">
+          <span className={`type-badge ${detectedType}`}>
+            Detected: {detectedType.charAt(0).toUpperCase() + detectedType.slice(1)}
+          </span>
+          {supportsVoice && (
+            <button type="button" className={`voice-button ${isListening ? 'listening' : ''}`} onClick={toggleVoice}>
+              <span className="voice-dot" />
+              {isListening ? 'Listening' : 'Voice'}
+            </button>
+          )}
         </div>
+        <button type="button" className="submit-button" onClick={handleSubmit}>
+          Capture
+        </button>
       </div>
     </div>
   )

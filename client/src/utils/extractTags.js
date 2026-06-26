@@ -1,13 +1,20 @@
-const KEYWORDS = ['work','personal','urgent','health','finance','shopping','meeting','call','email','project'];
+const KEYWORDS = ['work', 'personal', 'urgent', 'health', 'finance', 'shopping', 'meeting', 'call', 'email', 'project']
 
-export default function extractTags(text = ''){
-  const lower = text.toLowerCase();
-  const tagSet = new Set();
-  // hashtags
-  const hashRe = /#([a-z0-9_-]+)/gi;
-  let m;
-  while ((m = hashRe.exec(text)) !== null) tagSet.add(m[1].toLowerCase());
-  // keywords
-  for (const k of KEYWORDS) if (new RegExp(`\\b${k}\\b`).test(lower)) tagSet.add(k);
-  return Array.from(tagSet);
+export default function extractTags(text = '') {
+  const lowerText = text.toLowerCase()
+  const tagSet = new Set()
+
+  const hashRegex = /#([a-z0-9_-]+)/gi
+  let match
+  while ((match = hashRegex.exec(text)) !== null) {
+    tagSet.add(match[1].toLowerCase())
+  }
+
+  for (const keyword of KEYWORDS) {
+    if (new RegExp(`\\b${keyword}\\b`).test(lowerText)) {
+      tagSet.add(keyword)
+    }
+  }
+
+  return Array.from(tagSet)
 }

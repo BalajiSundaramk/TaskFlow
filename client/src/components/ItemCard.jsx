@@ -1,35 +1,63 @@
 import React from 'react'
 import { formatRelativeTime, formatDueDate } from '../utils/formatDate'
-import axios from 'axios'
 
-export default function ItemCard({ item, onToggleComplete, onDelete, onTagClick }){
-  const tags = JSON.parse(item.tags || '[]')
-  const overdue = item.type === 'reminder' && item.remind_at && new Date(item.remind_at) < new Date() && item.status !== 'completed'
+function normalizeTags(tags) {
+  if (Array.isArray(tags)) return tags
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
 
-  const toggle = ()=> onToggleComplete && onToggleComplete(item)
-  const del = ()=> onDelete && onDelete(item.id)
+export default function ItemCard({ item, onComplete, onDelete, onTagClick }) {
+  const tags = normalizeTags(item.tags)
+  const isReminderOverdue = item.type === 'reminder' && item.remind_at && new Date(item.remind_at) < new Date() && item.status !== 'completed'
+  const isCompleted = item.status === 'completed'
 
   return (
-    <div className={`item-card ${overdue ? 'overdue' : ''}`}>
-      <div className="item-content">
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div>
-            <span className={`badge ${item.type}`}>{item.type}</span>
-            <p className={item.status === 'completed' ? 'strike' : ''}>{item.content}</p>
-          </div>
-          <div className="controls">
-            {item.type === 'task' && <button className="btn" onClick={toggle}>{item.status === 'completed' ? '↺' : '✓'}</button>}
-            <button className="btn" onClick={del}>🗑</button>
-          </div>
+    <div className={`item-card ${isReminderOverdue ? 'reminder-overdue' : ''} ${isCompleted ? 'completed' : ''}`}>
+      <div className="item-main">
+        <div className="item-meta">
+          <span className={`type-badge ${item.type}`}>{item.type}</span>
+          <span className="muted">{formatRelativeTime(item.created_at)}</span>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:8,alignItems:'center'}}>
-          <div className="tags">
-            {tags.map(t=> <div key={t} className="tag" onClick={()=>onTagClick && onTagClick(t)}>{t}</div>)}
+
+        <p className="content-text">{item.content}</p>
+
+        {item.type === 'reminder' && item.remind_at && (
+          <div className="muted">Due {formatDueDate(item.remind_at)}</div>
+        )}
+
+        {tags.length > 0 && (
+          <div className="tag-row">
+            {tags.map((tag) => (
+              <button key={tag} type="button" className="tag-pill" onClick={() => onTagClick(tag)}>
+                #{tag}
+              </button>
+            ))}
           </div>
-          <div className="muted">
-            <small>{formatRelativeTime(item.created_at)}{item.type === 'reminder' && item.remind_at ? ` • ${formatDueDate(item.remind_at)}` : ''}</small>
-          </div>
-        </div>
+        )}
+      </div>
+
+      <div className="card-actions">
+        {item.type === 'task' && (
+          <button
+            type="button"
+            className={`action-btn complete ${isCompleted ? 'active' : ''}`}
+            onClick={() => onComplete(item.id)}
+            disabled={isCompleted}
+          >
+            ✓
+          </button>
+        )}
+        <button type="button" className="action-btn delete" onClick={() => onDelete(item.id)}>
+          🗑
+        </button>
       </div>
     </div>
   )

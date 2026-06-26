@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import { Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import detectIntent from './utils/detectIntent'
 import extractTags from './utils/extractTags'
 import Layout from './components/Layout'
@@ -14,82 +14,121 @@ import Toast from './components/Toast'
 
 export default function App() {
   const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilters, setActiveFilters] = useState({ type: null, tags: [] })
+  const [activeFilters, setActiveFilters] = useState({ type: null, tag: null })
+  const [isLoading, setIsLoading] = useState(false)
   const [toast, setToast] = useState(null)
 
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type })
+    window.setTimeout(() => setToast(null), 3000)
+  }
+
   const fetchItems = async () => {
-    setLoading(true)
+    setIsLoading(true)
     try {
       const res = await axios.get('/api/items')
       setItems(res.data)
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error(error)
       showToast('Failed to load items', 'error')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  useEffect(() => { fetchItems() }, [])
-
-  const showToast = (message, type='success') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
+  useEffect(() => {
+    fetchItems()
+  }, [])
 
   const handleCapture = async (text) => {
+    if (!text || !text.trim()) return
+
     const type = detectIntent(text)
     const tags = extractTags(text)
+
     try {
-      const res = await axios.post('/api/items', { content: text, type, tags })
-      showToast('Captured', 'success')
+      await axios.post('/api/items', {
+        content: text,
+        type,
+        tags: JSON.stringify(tags),
+        remind_at: null
+      })
+      showToast('Item captured successfully', 'success')
       fetchItems()
-      return res.data
-    } catch (err) {
-      showToast('Failed to capture', 'error')
-      throw err
+    } catch (error) {
+      console.error(error)
+      showToast('Failed to capture item', 'error')
     }
   }
 
-  const handleToggleComplete = async (item) => {
+  const handleComplete = async (id) => {
     try {
-      await axios.patch(`/api/items/${item.id}`, { status: item.status === 'completed' ? 'pending' : 'completed' })
+      await axios.patch(`/api/items/${id}`, { status: 'completed' })
+      showToast('Item marked complete', 'success')
       fetchItems()
-    } catch (err) { showToast('Failed to update', 'error') }
+    } catch (error) {
+      console.error(error)
+      showToast('Failed to update item', 'error')
+    }
   }
 
   const handleDelete = async (id) => {
     try {
       await axios.delete(`/api/items/${id}`)
+      showToast('Item deleted', 'success')
       fetchItems()
-    } catch (err) { showToast('Failed to delete', 'error') }
+    } catch (error) {
+      console.error(error)
+      showToast('Failed to delete item', 'error')
+    }
   }
 
   const handleTagClick = (tag) => {
-    setActiveFilters(prev => ({ ...prev, tags: prev.tags.includes(tag) ? prev.tags : [...prev.tags, tag] }))
+    setActiveFilters((prev) => ({ ...prev, tag }))
   }
 
-  const handleRemoveFilter = (filterType, value) => {
-    if (filterType === 'type') setActiveFilters(prev => ({ ...prev, type: null }))
-    if (filterType === 'tag') setActiveFilters(prev => ({ ...prev, tags: prev.tags.filter(t => t !== value) }))
+  const handleRemoveFilter = (filterKey) => {
+    if (filterKey === 'type') {
+      setActiveFilters((prev) => ({ ...prev, type: null }))
+    }
+    if (filterKey === 'tag') {
+      setActiveFilters((prev) => ({ ...prev, tag: null }))
+    }
   }
 
   return (
     <Layout>
       <div className="topbar">
-        <h1>TaskFlow</h1>
+        <div>
+          <h1>TaskFlow</h1>
+          <p className="muted">Capture ideas, tasks, and reminders in one calm workspace.</p>
+        </div>
       </div>
+
       <div className="capture-area">
-        <CaptureInput onSubmit={handleCapture} />
+        <CaptureInput onCapture={handleCapture} />
         <SearchBar onSearch={setSearchQuery} />
         <ActiveFilters filters={activeFilters} onRemove={handleRemoveFilter} />
       </div>
 
-      {loading ? <Spinner /> : (
+      {isLoading ? (
+        <Spinner />
+      ) : (
         <Routes>
-          <Route path="/" element={<ItemList items={items} searchQuery={searchQuery} activeFilters={activeFilters} onToggleComplete={handleToggleComplete} onDelete={handleDelete} onTagClick={handleTagClick} />} />
+          <Route
+            path="/"
+            element={
+              <ItemList
+                items={items}
+                searchQuery={searchQuery}
+                activeFilters={activeFilters}
+                onComplete={handleComplete}
+                onDelete={handleDelete}
+                onTagClick={handleTagClick}
+              />
+            }
+          />
           <Route path="/summary" element={<Summary />} />
         </Routes>
       )}
