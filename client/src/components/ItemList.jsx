@@ -17,10 +17,14 @@ function normalizeTags(tags) {
 export default function ItemList({ items = [], searchQuery = '', activeFilters = {}, onComplete, onDelete, onTagClick }) {
   const filteredItems = items.filter((item) => {
     const normalizedTags = normalizeTags(item.tags)
-    const content = `${item.content || ''} ${normalizedTags.join(' ')}`.toLowerCase()
-    const matchesSearch = !searchQuery || content.includes(searchQuery.toLowerCase())
+    const tagsText = normalizedTags.join(' ').toLowerCase()
+    const query = searchQuery.toLowerCase()
+    const content = `${item.content || ''} ${tagsText}`.toLowerCase()
+
+    const matchesSearch = !query || content.includes(query) || (item.tags || '').toLowerCase().includes(query)
     const matchesType = !activeFilters.type || item.type === activeFilters.type
-    const matchesTag = !activeFilters.tag || normalizedTags.includes(activeFilters.tag)
+    const matchesTag = !activeFilters.tag || tagsText.includes(activeFilters.tag.toLowerCase())
+
     return matchesSearch && matchesType && matchesTag
   })
 
@@ -29,10 +33,12 @@ export default function ItemList({ items = [], searchQuery = '', activeFilters =
   const reminders = filteredItems.filter((item) => item.type === 'reminder')
 
   const renderSection = (title, sectionItems, emptyMessage) => (
-    <section className="section-card">
+    <section className="section">
       <div className="section-header">
-        <h3>{title}</h3>
-        <span className="section-count">{sectionItems.length}</span>
+        <div className="section-title-row">
+          <h3 className="section-title">{title}</h3>
+          <span className="section-count">{sectionItems.length}</span>
+        </div>
       </div>
       {sectionItems.length === 0 ? (
         <div className="empty-state">{emptyMessage}</div>
@@ -45,10 +51,10 @@ export default function ItemList({ items = [], searchQuery = '', activeFilters =
   )
 
   return (
-    <div className="item-list">
-      {renderSection('Tasks', tasks, 'No tasks yet')}
-      {renderSection('Notes', notes, 'No notes yet')}
-      {renderSection('Reminders', reminders, 'No reminders yet')}
+    <div>
+      {renderSection('Tasks', tasks, 'No tasks yet. Start with a quick capture and keep momentum going.')}
+      {renderSection('Notes', notes, 'No notes yet. Capture reflections and references in one place.')}
+      {renderSection('Reminders', reminders, 'No reminders yet. Schedule the next thing that matters.')}
     </div>
   )
 }

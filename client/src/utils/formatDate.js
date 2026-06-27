@@ -24,14 +24,7 @@ export function formatDueDate(isoString) {
   if (!isoString) return ''
 
   const date = new Date(isoString)
-  const options = { weekday: 'short', month: 'short', day: 'numeric' }
-  const datePart = date.toLocaleDateString(undefined, options)
-  let hours = date.getHours()
-  const minutes = date.getMinutes()
-  const suffix = hours >= 12 ? 'PM' : 'AM'
-  hours = hours % 12 || 12
-  const mins = minutes.toString().padStart(2, '0')
-  return `${datePart}, ${hours}:${mins} ${suffix}`
+  return `${date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}, ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
 }
 
 export default {

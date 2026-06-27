@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const chrono = require('chrono-node');
 const db = require('../db/database');
 
 // Create item
@@ -10,9 +11,17 @@ router.post('/', (req, res) => {
   }
   const itemType = type && ['task','note','reminder'].includes(type) ? type : 'note';
   const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : []);
+  let parsedRemindAt = remind_at;
+
+  if (itemType === 'reminder') {
+    const parsedDate = chrono.parseDate(content);
+    if (parsedDate) {
+      parsedRemindAt = parsedDate.toISOString();
+    }
+  }
 
   const stmt = db.prepare(`INSERT INTO items (type, content, tags, remind_at) VALUES (?, ?, ?, ?)`);
-  const info = stmt.run(itemType, content, tagsJson, remind_at);
+  const info = stmt.run(itemType, content, tagsJson, parsedRemindAt);
   const created = db.prepare('SELECT * FROM items WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json(created);
 });
@@ -41,7 +50,11 @@ router.get('/', (req, res) => {
   query += ' ORDER BY created_at DESC';
 
   const items = db.prepare(query).all(...params);
-  res.json(items);
+  const enrichedItems = items.map((item) => ({
+    ...item,
+    is_overdue: item.type === 'reminder' && item.remind_at && item.status !== 'completed' && new Date(item.remind_at) < new Date()
+  }));
+  res.json(enrichedItems);
 });
 
 // Update status
