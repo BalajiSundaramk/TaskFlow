@@ -1,9 +1,11 @@
 const path = require('path');
 const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
 
 const dbPath = path.join(__dirname, 'data.db');
 const db = new Database(dbPath);
 
+// Create tables if they don't exist
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,48 +31,27 @@ CREATE TABLE IF NOT EXISTS items (
 );
 `);
 
-module.exports = db;
-const bcrypt = require('bcryptjs');
-
+// Create default admin if it doesn't exist
 const admin = db.prepare(
-  "SELECT * FROM users WHERE email=?"
+    "SELECT * FROM users WHERE email = ?"
 ).get("admin@taskflow.com");
 
 if (!admin) {
-    const hash = bcrypt.hashSync("admin123", 10);
+    const passwordHash = bcrypt.hashSync("admin123", 10);
 
     db.prepare(`
         INSERT INTO users
-        (name,email,password_hash,is_admin,status)
-        VALUES (?,?,?,?,?)
+        (name, email, password_hash, is_admin, status)
+        VALUES (?, ?, ?, ?, ?)
     `).run(
         "Administrator",
         "admin@taskflow.com",
-        hash,
+        passwordHash,
         1,
         "active"
     );
+
+    console.log("✅ Default admin created");
 }
-const bcrypt = require('bcryptjs');
 
-const admin = db.prepare(
-  "SELECT * FROM users WHERE email = ?"
-).get("admin@taskflow.com");
-
-if (!admin) {
-  const passwordHash = bcrypt.hashSync("admin123", 10);
-
-  db.prepare(`
-    INSERT INTO users
-    (name, email, password_hash, is_admin, status)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(
-    "Administrator",
-    "admin@taskflow.com",
-    passwordHash,
-    1,
-    "active"
-  );
-
-  console.log("Default admin created.");
-}
+module.exports = db;

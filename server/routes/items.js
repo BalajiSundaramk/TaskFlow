@@ -6,7 +6,6 @@ const authenticateToken = require('../middleware/auth');
 
 router.use(authenticateToken);
 
-// Create item
 router.post('/', (req, res) => {
   const { content, type, tags = [], remind_at = null } = req.body;
   if (!content || typeof content !== 'string') {
@@ -29,7 +28,6 @@ router.post('/', (req, res) => {
   res.status(201).json(created);
 });
 
-// Get all items with optional filters
 router.get('/', (req, res) => {
   const { type, tag } = req.query;
   let query = 'SELECT * FROM items';
