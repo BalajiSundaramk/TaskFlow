@@ -1,5 +1,6 @@
 import React from 'react'
 import ItemCard from './ItemCard'
+import Spinner from './Spinner'
 
 function normalizeTags(tags) {
   if (Array.isArray(tags)) return tags
@@ -14,16 +15,22 @@ function normalizeTags(tags) {
   return []
 }
 
-export default function ItemList({ items = [], searchQuery = '', activeFilters = {}, onComplete, onDelete, onTagClick }) {
+export default function ItemList({ items = [], searchQuery = '', activeFilters = {}, onComplete, onDelete, onTagClick, isLoading = false }) {
+  if (isLoading) {
+    return (
+      <div className="loading-state">
+        <Spinner />
+      </div>
+    )
+  }
+
   const filteredItems = items.filter((item) => {
     const normalizedTags = normalizeTags(item.tags)
-    const tagsText = normalizedTags.join(' ').toLowerCase()
-    const query = searchQuery.toLowerCase()
-    const content = `${item.content || ''} ${tagsText}`.toLowerCase()
-
-    const matchesSearch = !query || content.includes(query) || (item.tags || '').toLowerCase().includes(query)
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    const content = `${item.content || ''} ${normalizedTags.join(' ')}`.toLowerCase()
+    const matchesSearch = !normalizedQuery || content.includes(normalizedQuery)
     const matchesType = !activeFilters.type || item.type === activeFilters.type
-    const matchesTag = !activeFilters.tag || tagsText.includes(activeFilters.tag.toLowerCase())
+    const matchesTag = !activeFilters.tag || normalizedTags.some((tag) => tag.toLowerCase() === activeFilters.tag.toLowerCase())
 
     return matchesSearch && matchesType && matchesTag
   })
@@ -44,7 +51,7 @@ export default function ItemList({ items = [], searchQuery = '', activeFilters =
         <div className="empty-state">{emptyMessage}</div>
       ) : (
         sectionItems.map((item) => (
-          <ItemCard key={item.id} item={item} onComplete={onComplete} onDelete={onDelete} onTagClick={onTagClick} />
+          <ItemCard key={item.id} item={item} searchQuery={searchQuery} onComplete={onComplete} onDelete={onDelete} onTagClick={onTagClick} />
         ))
       )}
     </section>

@@ -1,15 +1,43 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "build-client",
-      "type": "shell",
-      "command": "npm run build",
-      "options": {
-        "cwd": "${workspaceFolder}/client"
-      },
-      "group": "build",
-      "problemMatcher": []
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build-client",
+			"type": "shell",
+			"command": "npm run build",
+			"options": {
+				"cwd": "${workspaceFolder}/client"
+			},
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "install-server-auth",
+			"type": "shell",
+			"command": "npm install bcryptjs jsonwebtoken",
+			"args": [],
+			"group": "build"
+		},
+		{
+			"label": "init-server-db",
+			"type": "shell",
+			"command": "node db/init.js",
+			"args": [],
+			"group": "build"
+		},
+		{
+			"label": "init-server-db",
+			"type": "shell",
+			"command": "node .\\db\\init.js",
+			"args": [],
+			"group": "build"
+		},
+		{
+			"label": "init-server-db-root",
+			"type": "shell",
+			"command": "node .\\server\\db\\init.js",
+			"args": [],
+			"group": "build"
+		}
+	]
 }

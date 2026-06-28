@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const chrono = require('chrono-node');
 const db = require('../db/database');
+const authenticateToken = require('../middleware/auth');
+
+router.use(authenticateToken);
 
 // Create item
 router.post('/', (req, res) => {
@@ -20,8 +23,8 @@ router.post('/', (req, res) => {
     }
   }
 
-  const stmt = db.prepare(`INSERT INTO items (type, content, tags, remind_at) VALUES (?, ?, ?, ?)`);
-  const info = stmt.run(itemType, content, tagsJson, parsedRemindAt);
+  const stmt = db.prepare(`INSERT INTO items (type, content, tags, remind_at, user_id) VALUES (?, ?, ?, ?, ?)`);
+  const info = stmt.run(itemType, content, tagsJson, parsedRemindAt, req.user.id);
   const created = db.prepare('SELECT * FROM items WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json(created);
 });
@@ -30,8 +33,8 @@ router.post('/', (req, res) => {
 router.get('/', (req, res) => {
   const { type, tag } = req.query;
   let query = 'SELECT * FROM items';
-  const conditions = [];
-  const params = [];
+  const conditions = ['user_id = ?'];
+  const params = [req.user.id];
 
   if (type) {
     conditions.push('type = ?');
@@ -60,13 +63,31 @@ router.get('/', (req, res) => {
 // Update status
 router.patch('/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { status } = req.body;
+  const { status, remind_at } = req.body;
   if (!id) return res.status(400).json({ error: 'Invalid id' });
-  const allowed = ['pending','completed','cancelled'];
-  if (!status || !allowed.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
-  const stmt = db.prepare('UPDATE items SET status = ? WHERE id = ?');
-  const info = stmt.run(status, id);
+  const updates = [];
+  const params = [];
+
+  if (status) {
+    const allowed = ['pending','in-progress','completed','cancelled'];
+    if (!allowed.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+    updates.push('status = ?');
+    params.push(status);
+  }
+
+  if (typeof remind_at !== 'undefined') {
+    updates.push('remind_at = ?');
+    params.push(remind_at);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No valid fields to update' });
+  }
+
+  params.push(id, req.user.id);
+  const stmt = db.prepare(`UPDATE items SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`);
+  const info = stmt.run(...params);
   if (info.changes === 0) return res.status(404).json({ error: 'Item not found' });
   const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
   res.json(updated);
@@ -76,8 +97,8 @@ router.patch('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid id' });
-  const stmt = db.prepare('DELETE FROM items WHERE id = ?');
-  const info = stmt.run(id);
+  const stmt = db.prepare('DELETE FROM items WHERE id = ? AND user_id = ?');
+  const info = stmt.run(id, req.user.id);
   if (info.changes === 0) return res.status(404).json({ error: 'Item not found' });
   res.status(204).send();
 });

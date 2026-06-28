@@ -15,7 +15,7 @@ export function formatRelativeTime(isoString) {
 
   const days = Math.floor(hours / 24)
   if (days === 1) return 'yesterday'
-  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`
+  if (days < 48) return `${days} day${days === 1 ? '' : 's'} ago`
 
   return date.toDateString()
 }
@@ -24,7 +24,17 @@ export function formatDueDate(isoString) {
   if (!isoString) return ''
 
   const date = new Date(isoString)
-  return `${date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}, ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+  const datePart = date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  })
+  const timePart = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+
+  return `${datePart} at ${timePart}`
 }
 
 export default {

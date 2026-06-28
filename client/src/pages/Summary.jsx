@@ -9,6 +9,7 @@ export default function Summary() {
 
   useEffect(() => {
     const loadItems = async () => {
+      setIsLoading(true)
       try {
         const res = await axios.get('/api/items')
         setItems(res.data)
@@ -22,15 +23,26 @@ export default function Summary() {
     loadItems()
   }, [])
 
-  const tasks = items.filter((item) => item.type === 'task')
-  const notes = items.filter((item) => item.type === 'note')
-  const reminders = items.filter((item) => item.type === 'reminder')
-  const completedTasks = tasks.filter((item) => item.status === 'completed').length
-  const pendingTasks = tasks.length - completedTasks
+  const totalTasks = items.filter((item) => item.type === 'task')
+  const completedTasks = totalTasks.filter((item) => item.status === 'completed')
+  const pendingTasks = totalTasks.length - completedTasks.length
+  const totalNotes = items.filter((item) => item.type === 'note')
+  const totalReminders = items.filter((item) => item.type === 'reminder')
   const now = new Date()
-  const upcomingReminders = reminders.filter((item) => item.remind_at && new Date(item.remind_at) > now && item.status !== 'completed')
-  const overdueReminders = reminders.filter((item) => item.remind_at && new Date(item.remind_at) < now && item.status !== 'completed')
-  const todaysItems = items.filter((item) => new Date(item.created_at) >= new Date(now.getTime() - 24 * 60 * 60 * 1000))
+  const upcomingReminders = totalReminders.filter((item) => item.status !== 'completed' && item.remind_at && new Date(item.remind_at) > now)
+  const overdueReminders = totalReminders.filter((item) => item.status !== 'completed' && item.remind_at && new Date(item.remind_at) < now)
+  const todaysItems = items.filter((item) => new Date(item.created_at) > new Date(Date.now() - 86400000))
+
+  const metricCards = [
+    { value: totalTasks.length, label: 'Total Tasks', className: '' },
+    { value: completedTasks.length, label: 'Completed', className: 'success' },
+    { value: pendingTasks, label: 'Pending Tasks', className: pendingTasks > 0 ? 'warning' : '' },
+    { value: totalNotes.length, label: 'Notes', className: '' },
+    { value: totalReminders.length, label: 'Reminders', className: '' },
+    { value: upcomingReminders.length, label: 'Upcoming', className: 'success' },
+    { value: overdueReminders.length, label: 'Overdue', className: overdueReminders.length > 0 ? 'danger' : '' },
+    { value: todaysItems.length, label: "Today's Captures", className: '' }
+  ]
 
   return (
     <div className="summary-page">
@@ -44,38 +56,16 @@ export default function Summary() {
       ) : (
         <>
           <div className="metrics-grid">
-            <div className="metric-card">
-              <div className="metric-value">{tasks.length}</div>
-              <div className="metric-label">Tasks</div>
-            </div>
-            <div className="metric-card success">
-              <div className="metric-value">{completedTasks}</div>
-              <div className="metric-label">Completed</div>
-            </div>
-            <div className="metric-card warning">
-              <div className="metric-value">{pendingTasks}</div>
-              <div className="metric-label">Pending</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-value">{notes.length}</div>
-              <div className="metric-label">Notes</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-value">{reminders.length}</div>
-              <div className="metric-label">Reminders</div>
-            </div>
-            <div className="metric-card warning">
-              <div className="metric-value">{upcomingReminders.length}</div>
-              <div className="metric-label">Upcoming</div>
-            </div>
-            <div className="metric-card danger">
-              <div className="metric-value">{overdueReminders.length}</div>
-              <div className="metric-label">Overdue</div>
-            </div>
+            {metricCards.map((card) => (
+              <div key={card.label} className={`metric-card${card.className ? ` ${card.className}` : ''}`}>
+                <div className="metric-value">{card.value}</div>
+                <div className="metric-label">{card.label}</div>
+              </div>
+            ))}
           </div>
 
           <div>
-            <h3 className="todays-title">Today's captures</h3>
+            <h3 className="todays-title">Today's Captures</h3>
             {todaysItems.length === 0 ? (
               <div className="empty-state">No captures today yet.</div>
             ) : (

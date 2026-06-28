@@ -1,7 +1,8 @@
 import React from 'react'
 import { formatRelativeTime, formatDueDate } from '../utils/formatDate'
+import highlightText from '../utils/highlightText'
 
-export default function ItemCard({ item, onComplete, onDelete, onTagClick }) {
+export default function ItemCard({ item, searchQuery = '', onComplete, onDelete, onTagClick }) {
   const parsedTags = (() => {
     try {
       return JSON.parse(item.tags)
@@ -15,7 +16,9 @@ export default function ItemCard({ item, onComplete, onDelete, onTagClick }) {
   return (
     <div className={`item-card${isOverdue ? ' overdue' : ''}${isCompleted ? ' completed' : ''}`}>
       <div className="item-header">
-        <p className="item-content">{item.content}</p>
+        <div className="item-content">
+          {searchQuery ? highlightText(item.content, searchQuery) : item.content}
+        </div>
         <div className="item-actions">
           {item.type === 'task' && (
             <button type="button" className="action-btn complete" onClick={() => onComplete(item.id)}>
