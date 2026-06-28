@@ -1,10 +1,12 @@
 {
   "name": "taskflow",
+  "private": true,
   "version": "1.0.0",
-  "scripts": {
-  "build": "cd client && npm install --include=dev && npm run build && cd ../server && npm install"
-},
   "engines": {
-    "node": ">=18.0.0"
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "npm --prefix client ci && npm --prefix client run build && npm --prefix server ci",
+    "start": "npm --prefix server start"
   }
 }
