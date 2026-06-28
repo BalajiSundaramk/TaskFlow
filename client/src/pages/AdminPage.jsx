@@ -1,21 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { format, formatDistanceToNowStrict } from 'date-fns';
-
-function formatDate(value) {
-  if (!value) return '';
-  return format(new Date(value), 'MMM d, yyyy');
-}
-
-function formatTime(value) {
-  if (!value) return '';
-  return format(new Date(value), 'h:mm a');
-}
-
-function formatLastLogin(value) {
-  if (!value) return 'Never';
-  return formatDistanceToNowStrict(new Date(value), { addSuffix: true });
-}
 
 function getStatusBadge(status) {
   return status === 'suspended' ? 'status-badge suspended' : 'status-badge active';
@@ -36,6 +20,24 @@ export default function AdminPage() {
   const showToast = (message) => {
     setToast(message);
     window.setTimeout(() => setToast(''), 3000);
+  };
+
+  const formatCreated = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatRelative = (iso) => {
+    if (!iso) return 'Never';
+    const diff = Date.now() - new Date(iso);
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return mins + ' min ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + ' hour' + (hrs > 1 ? 's' : '') + ' ago';
+    const days = Math.floor(hrs / 24);
+    return days + ' day' + (days > 1 ? 's' : '') + ' ago';
   };
 
   const fetchData = async () => {
@@ -119,16 +121,17 @@ export default function AdminPage() {
       {toast ? <div className="toast-notice">{toast}</div> : null}
 
       {activeTab === 'users' ? (
-        <div className="admin-table-scroll">
-          <table className="admin-table">
+        <div className="admin-table-wrap">
+          <table className="admin-tbl">
             <thead>
               <tr>
-                <th style={{ width: '200px' }}>User</th>
-                <th style={{ width: '180px' }}>Email</th>
-                <th style={{ width: '220px' }}>Password Hash</th>
-                <th style={{ width: '160px' }}>Account Created</th>
-                <th style={{ width: '140px' }}>Last Login</th>
-                <th style={{ width: '100px' }}>Status</th>
+                <th style={{ width: '44px' }} />
+                <th style={{ width: '160px' }}>User</th>
+                <th style={{ width: '160px' }}>Email</th>
+                <th style={{ width: '240px' }}>Password Hash</th>
+                <th style={{ width: '130px' }}>Created</th>
+                <th style={{ width: '130px' }}>Last Login</th>
+                <th style={{ width: '110px' }}>Status</th>
                 <th style={{ width: '160px' }}>Actions</th>
               </tr>
             </thead>
@@ -136,61 +139,71 @@ export default function AdminPage() {
               {users.map((user) => (
                 <tr key={user.id}>
                   <td>
-                    <div className="user-cell">
-                      <div className="avatar-circle">{user.name?.charAt(0).toUpperCase()}</div>
-                      <div>
-                        <div>{user.name}</div>
-                        <div className="user-email-text">{user.email}</div>
-                      </div>
+                    <div className="av-circle">{user.name?.[0]?.toUpperCase() ?? '?'}</div>
+                  </td>
+                  <td>
+                    <div className="u-name">{user.name}</div>
+                  </td>
+                  <td>
+                    <div className="u-email">{user.email}</div>
+                  </td>
+                  <td>
+                    <div className="hash-row">
+                      <span className="hash-txt">{user.password_hash?.substring(0, 24)}...</span>
+                      <button
+                        type="button"
+                        className="copy-hash"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(user.password_hash);
+                            setCopiedUser(user.id);
+                            setTimeout(() => setCopiedUser(null), 2000);
+                          } catch (clipboardError) {
+                            setError('Unable to copy password hash');
+                          }
+                        }}
+                        title="Copy full hash"
+                      >
+                        ⧉
+                      </button>
                     </div>
                   </td>
-                  <td className="plain-cell">{user.email}</td>
-                  <td className="hash-cell">
-                    <span>{user.password_hash?.slice(0, 20) ?? ''}...</span>
-                    <button
-                      type="button"
-                      className="copy-btn"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(user.password_hash);
-                          setCopiedUser(user.id);
-                          setTimeout(() => setCopiedUser(null), 2000);
-                        } catch (clipboardError) {
-                          setError('Unable to copy password hash');
-                        }
-                      }}
-                    >
-                      📋
-                    </button>
-                    {copiedUser === user.id ? <span className="copy-tooltip">Copied!</span> : null}
+                  <td>
+                    <div className="u-date">{formatCreated(user.created_at)}</div>
                   </td>
-                  <td className="date-cell">
-                    <div>{formatDate(user.created_at)}</div>
-                    <div className="secondary-text">{formatTime(user.created_at)}</div>
+                  <td>
+                    <div className="u-login">
+                      {user.last_login ? formatRelative(user.last_login) : <span className="never">Never</span>}
+                    </div>
                   </td>
-                  <td className="date-cell">
-                    {user.last_login ? <span>{formatLastLogin(user.last_login)}</span> : <span className="secondary-text">Never</span>}
+                  <td>
+                    <div className="status-col">
+                      <span className={`sbadge ${user.status}`}>{user.status === 'active' ? 'Active' : 'Suspended'}</span>
+                      {user.is_admin === 1 && <span className="sbadge admin-pill">Admin</span>}
+                    </div>
                   </td>
-                  <td className="plain-cell"><span className={getStatusBadge(user.status)}>{user.status === 'active' ? 'Active' : 'Suspended'}</span></td>
-                  <td className="action-cell">
-                    <button
-                      type="button"
-                      className={user.is_admin === 1 ? 'action-btn-suspend disabled' : user.status === 'active' ? 'action-btn-suspend' : 'action-btn-activate'}
-                      disabled={user.is_admin === 1}
-                      onClick={() => handleSuspend(user.id, user.status)}
-                      title={user.is_admin === 1 ? 'Cannot modify admin' : ''}
-                    >
-                      {user.is_admin === 1 ? 'Admin' : user.status === 'active' ? 'Suspend' : 'Activate'}
-                    </button>
-                    <button
-                      type="button"
-                      className="action-btn-delete"
-                      onClick={() => handleDelete(user.id)}
-                      disabled={user.is_admin === 1}
-                      title={user.is_admin === 1 ? 'Cannot delete admin' : ''}
-                    >
-                      Delete
-                    </button>
+                  <td>
+                    <div className="act-row">
+                      {user.is_admin === 1 ? (
+                        <button className="btn-act disabled" disabled>Admin</button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={user.status === 'active' ? 'btn-act suspend' : 'btn-act activate'}
+                          onClick={() => handleSuspend(user.id, user.status)}
+                        >
+                          {user.status === 'active' ? 'Suspend' : 'Activate'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={user.is_admin === 1 ? 'btn-act disabled' : 'btn-act delete'}
+                        disabled={user.is_admin === 1}
+                        onClick={() => user.is_admin !== 1 && handleDelete(user.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
