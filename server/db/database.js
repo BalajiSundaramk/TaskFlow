@@ -51,3 +51,26 @@ if (!admin) {
         "active"
     );
 }
+const bcrypt = require('bcryptjs');
+
+const admin = db.prepare(
+  "SELECT * FROM users WHERE email = ?"
+).get("admin@taskflow.com");
+
+if (!admin) {
+  const passwordHash = bcrypt.hashSync("admin123", 10);
+
+  db.prepare(`
+    INSERT INTO users
+    (name, email, password_hash, is_admin, status)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    "Administrator",
+    "admin@taskflow.com",
+    passwordHash,
+    1,
+    "active"
+  );
+
+  console.log("Default admin created.");
+}
