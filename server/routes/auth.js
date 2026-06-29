@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../db/database');
+const client = require('../db/turso');
 
 const router = express.Router();
 const JWT_SECRET = 'taskflow_secret_key_2024';
@@ -19,23 +19,27 @@ function createToken(user) {
   );
 }
 
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   const { name, email, password } = req.body || {};
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
   }
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-  if (existing) {
-    return res.status(409).json({ error: 'Email already exists' });
-  }
-
   try {
-    const passwordHash = bcrypt.hashSync(password, 10);
-    const stmt = db.prepare('INSERT INTO users (name, email, password_hash, is_admin, status) VALUES (?, ?, ?, 0, ?);');
-    const info = stmt.run(name, email, passwordHash, 'active');
-    const user = db.prepare('SELECT id, name, email, is_admin, status FROM users WHERE id = ?').get(info.lastInsertRowid);
+    const existing = await client.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [email] });
+    if (existing && existing.rows && existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await client.execute({
+      sql: 'INSERT INTO users (name, email, password_hash, is_admin, status) VALUES (?, ?, ?, 0, ?);',
+      args: [name, email, passwordHash, 'active']
+    });
+
+    const sel = await client.execute({ sql: 'SELECT id, name, email, is_admin, status FROM users WHERE email = ?', args: [email] });
+    const user = sel && sel.rows && sel.rows[0];
     const token = createToken(user);
 
     return res.status(201).json({ token, user });
@@ -45,29 +49,30 @@ router.post('/register', (req, res) => {
   }
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body || {};
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  if (user.status === 'suspended') {
-    return res.status(403).json({ error: 'Your account has been suspended. Contact admin.' });
-  }
-
   try {
-    const isValid = bcrypt.compareSync(password, user.password_hash);
+    const sel = await client.execute({ sql: 'SELECT * FROM users WHERE email = ?', args: [email] });
+    const user = sel && sel.rows && sel.rows[0];
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (user.status === 'suspended') {
+      return res.status(403).json({ error: 'Your account has been suspended. Contact admin.' });
+    }
+
+    const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+    await client.execute({ sql: 'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', args: [user.id] });
 
     const safeUser = {
       id: user.id,

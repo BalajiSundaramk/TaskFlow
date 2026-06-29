@@ -5,6 +5,9 @@ const path = require('path');
 
 dotenv.config();
 
+// initialize Turso database (creates tables and default admin)
+require('./db/init-turso')();
+
 const app = express();
 
 app.use(cors());

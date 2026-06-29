@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const chrono = require('chrono-node');
-const db = require('../db/database');
+const client = require('../db/turso');
 const authenticateToken = require('../middleware/auth');
 
 router.use(authenticateToken);
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { content, type, tags = [], remind_at = null } = req.body;
   if (!content || typeof content !== 'string') {
     return res.status(400).json({ error: 'Content is required' });
@@ -22,13 +22,20 @@ router.post('/', (req, res) => {
     }
   }
 
-  const stmt = db.prepare(`INSERT INTO items (type, content, tags, remind_at, user_id) VALUES (?, ?, ?, ?, ?)`);
-  const info = stmt.run(itemType, content, tagsJson, parsedRemindAt, req.user.id);
-  const created = db.prepare('SELECT * FROM items WHERE id = ?').get(info.lastInsertRowid);
-  res.status(201).json(created);
+  try {
+    const ins = await client.execute({
+      sql: 'INSERT INTO items (type, content, tags, remind_at, user_id) VALUES (?, ?, ?, ?, ?) RETURNING *',
+      args: [itemType, content, tagsJson, parsedRemindAt, req.user.id]
+    });
+    const created = ins && ins.rows && ins.rows[0];
+    return res.status(201).json(created);
+  } catch (err) {
+    console.error('Create item error', err);
+    return res.status(500).json({ error: 'Failed to create item' });
+  }
 });
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { type, tag } = req.query;
   let query = 'SELECT * FROM items';
   const conditions = ['user_id = ?'];
@@ -50,16 +57,22 @@ router.get('/', (req, res) => {
 
   query += ' ORDER BY created_at DESC';
 
-  const items = db.prepare(query).all(...params);
-  const enrichedItems = items.map((item) => ({
-    ...item,
-    is_overdue: item.type === 'reminder' && item.remind_at && item.status !== 'completed' && new Date(item.remind_at) < new Date()
-  }));
-  res.json(enrichedItems);
+  try {
+    const r = await client.execute({ sql: query, args: params });
+    const items = (r && r.rows) || [];
+    const enrichedItems = items.map((item) => ({
+      ...item,
+      is_overdue: item.type === 'reminder' && item.remind_at && item.status !== 'completed' && new Date(item.remind_at) < new Date()
+    }));
+    return res.json(enrichedItems);
+  } catch (err) {
+    console.error('Fetch items error', err);
+    return res.status(500).json({ error: 'Failed to fetch items' });
+  }
 });
 
 // Update status
-router.patch('/:id', (req, res) => {
+router.patch('/:id', async (req, res) => {
   const id = Number(req.params.id);
   const { status, remind_at } = req.body;
   if (!id) return res.status(400).json({ error: 'Invalid id' });
@@ -83,22 +96,32 @@ router.patch('/:id', (req, res) => {
     return res.status(400).json({ error: 'No valid fields to update' });
   }
 
-  params.push(id, req.user.id);
-  const stmt = db.prepare(`UPDATE items SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`);
-  const info = stmt.run(...params);
-  if (info.changes === 0) return res.status(404).json({ error: 'Item not found' });
-  const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
-  res.json(updated);
+  try {
+    params.push(id, req.user.id);
+    const sql = `UPDATE items SET ${updates.join(', ')} WHERE id = ? AND user_id = ? RETURNING *`;
+    const r = await client.execute({ sql, args: params });
+    const updated = r && r.rows && r.rows[0];
+    if (!updated) return res.status(404).json({ error: 'Item not found' });
+    return res.json(updated);
+  } catch (err) {
+    console.error('Update item error', err);
+    return res.status(500).json({ error: 'Failed to update item' });
+  }
 });
 
 // Delete
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid id' });
-  const stmt = db.prepare('DELETE FROM items WHERE id = ? AND user_id = ?');
-  const info = stmt.run(id, req.user.id);
-  if (info.changes === 0) return res.status(404).json({ error: 'Item not found' });
-  res.status(204).send();
+  try {
+    const r = await client.execute({ sql: 'DELETE FROM items WHERE id = ? AND user_id = ? RETURNING id', args: [id, req.user.id] });
+    const deleted = r && r.rows && r.rows[0];
+    if (!deleted) return res.status(404).json({ error: 'Item not found' });
+    return res.status(204).send();
+  } catch (err) {
+    console.error('Delete item error', err);
+    return res.status(500).json({ error: 'Failed to delete item' });
+  }
 });
 
 module.exports = router;
