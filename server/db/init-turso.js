@@ -32,8 +32,8 @@ async function ensureTables() {
 }
 
 async function ensureAdmin() {
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@taskflow.com';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@1234';
 
   // Check if admin exists
   const sel = await client.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [adminEmail] });
